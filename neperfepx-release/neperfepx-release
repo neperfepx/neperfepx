@@ -1,0 +1,259 @@
+#!/bin/bash
+
+set -e
+
+VERSION="1.0.1-6"
+
+sed_i ()
+{
+  if [ `uname` == "Linux" ]
+  then
+    sed -i $@
+  else
+    sed -i '' -e "$@"
+  fi
+}
+
+if [ "`pwd | grep "$NEPERROOT"`" ]
+then
+  NAME="Neper"
+  ROOT=$NEPERROOT
+elif [ "`pwd | grep "$FEPXROOT"`" ]
+then
+  NAME="FEPX"
+  ROOT=$FEPXROOT
+else
+  echo "I am not in a Neper or FEPX directory.  Exiting..."
+  exit -1
+fi
+
+stage=`awk -v arg="$1" 'BEGIN{if (arg) {print arg} else {print 1}}'`
+
+echo -e "\n=========================== neperfepx-release =========================="
+echo "Releasing $NAME..."
+echo "ROOT directory: $ROOT"
+echo "Start stage   : $stage"
+echo "You should have made a backup of your local repositories."
+echo "Your local repositories should be up-to-date with the remote repositories."
+echo "Your VERSIONS file should be up-to-date."
+echo ""
+cd $ROOT
+echo "I am going to remove $ROOT/src/build."
+
+ans="n"
+while [ "$ans" != "y" ]
+do
+  echo -e "\nDo you want to continue? [y/n]"
+  read ans
+done
+
+NAME=`echo "$NAME" | tr '[:upper:]' '[:lower:]'`
+NAME_UPPERCASE=`echo "$NAME" | tr '[:lower:]' '[:upper:]'`
+
+rm -rf $ROOT/src/build
+
+echo "--- Reading user input -------------------------------------------------"
+
+echo "Enter old version number (x.x.x): "
+read oldversion
+echo "Enter new version number (x.x.x): "
+read newversion
+
+oldversiontagstart=`echo $oldversion | awk -F. '{print "v"$1"."$2"."$3+1"-start"}'`
+newdate=`date +"%d %b %G"`
+newversiontag="v$newversion"
+nextversion=`echo $newversion | awk -F. '{print $1"."$2"."$3+1}'`
+nextversiontagstart="v$nextversion-start"
+
+echo "Checking start tag..."
+git tag | grep $oldversiontagstart > /dev/null
+
+if [ $stage -le 1 ]
+then
+  echo "--- Creating new version locally (reworking branches and tags) ---------"
+
+  echo "Moving to the root directory..."
+  cd $ROOT
+
+  echo "Checking out to branch 'main'..."
+  git checkout --quiet main
+
+  echo "Merging branch 'devel'..."
+  git merge --quiet --squash -X theirs devel
+
+  echo "Updating version to $newversion in VERSIONS..."
+  sed_i "1s/.*/New in $newversion ($newdate):/g" $ROOT/VERSIONS
+
+  echo "Updating version to $newversion in doc..."
+  sed_i "s/version =.*/version = u\'$newversion\'/g" $ROOT/doc/conf.py
+  sed_i "s/release =.*/release = u\'$newversion\'/g" $ROOT/doc/conf.py
+
+  echo "Updating version to $newversion in src..."
+  sed_i "s/set(${NAME_UPPERCASE}_VERSION.*/set(${NAME_UPPERCASE}_VERSION \\\\\"$newversion\\\\\")/g" $ROOT/src/CMakeLists.txt
+
+  if [ "$NAME" == "fepx" ]
+  then
+    sed_i "s/WRITE(DFLT_U,'(A)')'Info   : Version.*/WRITE(DFLT_U,'(A)')'Info   : Version $newversion'/g" $ROOT/src/fepx.f90
+  fi
+
+  echo "Adding version changes..."
+  git add VERSIONS doc/conf.py src/CMakeLists.txt
+  if [ "$NAME" == "fepx" ]
+  then
+    git add src/fepx.f90
+  fi
+
+  echo "Preparing commit message..."
+  if [ "`echo $newversion | awk -F. '{print $3}'`" == "0" ]
+  then
+    header="Add new capabilities\n\n"
+  else
+    header="Make minor improvements and fix bugs\n\n"
+  fi
+  echo -ne "$header" > commit.tmp
+  awk '{if (NR>1) {if (NF) {print $0} else {exit}}}' VERSIONS >> commit.tmp
+
+  echo "Committing new release..."
+  git commit --quiet -F commit.tmp && rm commit.tmp
+
+  echo "Adding tag '$newversiontag'..."
+  git tag $newversiontag -m "Version $newversion."
+
+  echo "Adding tag '$nextversiontagstart'..."
+  git tag $nextversiontagstart -m "Starting version $nextversion."
+
+  echo "Archiving 'devel' branch as 'devel-$oldversion'..."
+  git branch -m devel devel-$oldversion
+
+  echo "Starting new 'devel' branch from 'main'..."
+  git branch devel
+fi
+
+if [ $stage -le 2 ]
+then
+  echo "--- Compiling and testing code and doc ---------------------------------"
+
+  echo "Creating and moving to $ROOT/src/build..."
+  cd $ROOT/src && mkdir build && cd build
+
+  echo "Running cmake..."
+  cmake .. > /dev/null
+
+  echo "Running make..."
+  make -j > /dev/null
+
+  echo "Checking version number in program header..."
+  (exit `./$NAME | awk -v v=$newversion '{if ($3=="Version") {print ($NF!=v)}}'`)
+
+  echo "Running ctest..."
+  ctest > /dev/null 2> /dev/null
+
+  echo "Cleaning src..."
+  rm -rf $ROOT/src/build
+
+  echo "Moving to doc directory..."
+  cd $ROOT/doc
+
+  echo "Checking version number in documentation..."
+  (exit `grep "version =" $ROOT/doc/conf.py | awk -v v="u'$newversion'" '{print ($NF!=v)}'`)
+
+  echo "Building html doc..."
+  make html > /dev/null 2> /dev/null
+
+  echo "Cleaning html doc..."
+  make clean > /dev/null
+
+  rm -rf /tmp/$NAME-doc
+  cp -r $ROOT/doc /tmp/$NAME-doc
+fi
+
+if [ $stage -le 3 ]
+then
+  echo "--- Updating website's sources -----------------------------------------"
+
+  cd $ROOT
+  git checkout gh-pages
+
+  echo "Copying doc..."
+  rm -rf $ROOT/doc
+  mv /tmp/$NAME-doc doc
+  rm $ROOT/doc/conf.py
+  sed_i "1s/.*/.. _documentation/g" $ROOT/doc/index.rst
+  sed_i "3s/.*/Documentation/g" $ROOT/doc/index.rst
+
+  echo "Updating version to $newversion in website..."
+  sed_i "s/version =.*/version = u\'$newversion\'/g" $ROOT/conf.py
+
+  echo "Compiling..."
+  rm -rf $ROOT/docs
+  make html > /dev/null 2> /dev/null
+  make html > /dev/null 2> /dev/null
+
+  git add .
+  git commit -m "Update website to version $newversion"
+fi
+
+if [ $stage -le 5 ]
+then
+  ans="n"
+  while [ "$ans" != "y" ]
+  do
+    echo -e "\nReady to release? [y/n]"
+    read ans
+  done
+
+  echo "--- Releasing code to GitHub public ------------------------------------"
+
+  echo "Moving to $ROOT..."
+  cd $ROOT
+
+  for var in main $newversiontag
+  do
+    echo "Pushing $var to github..."
+    git push --quiet -f github $var
+  done
+fi
+
+if [ $stage -le 6 ]
+then
+  echo "--- Updating branches and tags on GitHub private -----------------------"
+
+  echo "Moving to $ROOT..."
+  cd $ROOT
+
+  for var in main $newversiontag devel-$oldversion devel :$oldversiontagstart $nextversiontagstart
+  do
+    echo "Pushing $var to github-dev..."
+    git push --quiet -f github-dev $var > /dev/null
+  done
+fi
+
+if [ $stage -le 7 ]
+then
+  echo "--- Uploading website --------------------------------------------------"
+
+  cd $ROOT
+  echo "Uploading website..."
+  git push --quiet github-dev gh-pages
+  git push --quiet github gh-pages
+fi
+
+if [ $stage -le 8 ]
+then
+  echo "--- Making new GitHub release ------------------------------------------"
+
+  echo "Moving to $ROOT..."
+  cd $ROOT
+  git checkout main
+
+  sed -e '/^$/,$d' VERSIONS > release-notes-file
+
+  gh auth login
+  gh release create $newversiontag --notes-file release-notes-file
+
+  rm release-notes-file
+fi
+
+echo "========================================================================"
+
+exit 0
