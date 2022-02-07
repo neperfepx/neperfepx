@@ -4,16 +4,6 @@ set -e
 
 VERSION="1.0.1-6"
 
-sed_i ()
-{
-  if [ `uname` == "Linux" ]
-  then
-    sed -i $@
-  else
-    sed -i '' -e "$@"
-  fi
-}
-
 if [ "`pwd | grep "$NEPERROOT"`" ]
 then
   NAME="Neper"
@@ -82,18 +72,18 @@ then
   git merge --quiet --squash -X theirs devel
 
   echo "Updating version to $newversion in VERSIONS..."
-  sed_i "1s/.*/New in $newversion ($newdate):/g" $ROOT/VERSIONS
+  sed -i "1s/.*/New in $newversion ($newdate):/g" $ROOT/VERSIONS
 
   echo "Updating version to $newversion in doc..."
-  sed_i "s/version =.*/version = u\'$newversion\'/g" $ROOT/doc/conf.py
-  sed_i "s/release =.*/release = u\'$newversion\'/g" $ROOT/doc/conf.py
+  sed -i "s/version =.*/version = u\'$newversion\'/g" $ROOT/doc/conf.py
+  sed -i "s/release =.*/release = u\'$newversion\'/g" $ROOT/doc/conf.py
 
   echo "Updating version to $newversion in src..."
-  sed_i "s/set(${NAME_UPPERCASE}_VERSION.*/set(${NAME_UPPERCASE}_VERSION \\\\\"$newversion\\\\\")/g" $ROOT/src/CMakeLists.txt
+  sed -i "s/set(${NAME_UPPERCASE}_VERSION.*/set(${NAME_UPPERCASE}_VERSION \\\\\"$newversion\\\\\")/g" $ROOT/src/CMakeLists.txt
 
   if [ "$NAME" == "fepx" ]
   then
-    sed_i "s/WRITE(DFLT_U,'(A)')'Info   : Version.*/WRITE(DFLT_U,'(A)')'Info   : Version $newversion'/g" $ROOT/src/fepx.f90
+    sed -i "s/WRITE(DFLT_U,'(A)')'Info   : Version.*/WRITE(DFLT_U,'(A)')'Info   : Version $newversion'/g" $ROOT/src/fepx.f90
   fi
 
   echo "Adding version changes..."
@@ -178,11 +168,11 @@ then
   rm -rf $ROOT/doc
   mv /tmp/$NAME-doc doc
   rm $ROOT/doc/conf.py
-  sed_i "1s/.*/.. _documentation/g" $ROOT/doc/index.rst
-  sed_i "3s/.*/Documentation/g" $ROOT/doc/index.rst
+  sed -i "1s/.*/.. _documentation/g" $ROOT/doc/index.rst
+  sed -i "3s/.*/Documentation/g" $ROOT/doc/index.rst
 
   echo "Updating version to $newversion in website..."
-  sed_i "s/version =.*/version = u\'$newversion\'/g" $ROOT/conf.py
+  sed -i "s/version =.*/version = u\'$newversion\'/g" $ROOT/conf.py
 
   echo "Compiling..."
   rm -rf $ROOT/docs
