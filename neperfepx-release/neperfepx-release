@@ -155,6 +155,7 @@ then
 
   rm -rf /tmp/$NAME-doc
   cp -r $ROOT/doc /tmp/$NAME-doc
+  cp $ROOT/VERSIONS /tmp/$NAME-VERSIONS
 fi
 
 if [ $stage -le 3 ]
@@ -164,6 +165,8 @@ then
   cd $ROOT
   git checkout gh-pages
 
+  echo "Copying VERSIONS..."
+  mv /tmp/$NAME-VERSIONS VERSIONS
   echo "Copying doc..."
   rm -rf $ROOT/doc
   mv /tmp/$NAME-doc doc
