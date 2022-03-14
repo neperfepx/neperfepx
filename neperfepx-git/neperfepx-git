@@ -2,7 +2,7 @@
 
 # set -e
 
-VERSION="1.0.1-6"
+VERSION="1.0.1-5"
 
 sed_i ()
 {
@@ -130,6 +130,14 @@ neperfepx_git_merge()
     exit 0
   fi
 
+  CMakeLists_change=`git diff --numstat $@:src/CMakeLists.txt HEAD:src/CMakeLists.txt | awk '{if ($1==1 && $2==1) {print "0"} else {print "1"}}'`
+  VERSIONS_change=`git diff --numstat $@:VERSIONS HEAD:VERSIONS | awk '{if ($1==1 && $2==1) {print "0"} else {print "1"}}'`
+  confpy_change=`git diff --numstat $@:doc/conf.py HEAD:doc/conf.py | awk '{if ($1==2 && $2==2) {print "0"} else {print "1"}}'`
+  if [ "$CODE" == "FEPX" ]
+  then
+    fepx_change=`git diff --numstat $@:src/fepx.f90 HEAD:src/fepx.f90 | awk '{if ($1==1 && $2==1) {print "0"} else {print "1"}}'`
+  fi
+
   # Merging branch silently
   git merge --no-edit $@ > ~/.neperfepx-git.tmp
 
@@ -156,7 +164,7 @@ neperfepx_git_merge()
     # Resolving versioning conflicts
     echo "Resolving versioning conflicts..."
 
-    version_files="VERSIONS src/CMakeLists.txt doc/texinfo/version.texi"
+    version_files="VERSIONS src/CMakeLists.txt doc/conf.py"
     if [ "$CODE" == "FEPX" ]
     then
       version_files="$version_files src/fepx.f90"
@@ -165,13 +173,7 @@ neperfepx_git_merge()
     for file in $version_files
     do
       # Checking if only the version line changed (qty=1)
-      qty=`grep HEAD $ROOT/$file | wc -l`
-      if [ "$qty" == "1" ]
-      then
-        beg=`grep -n "<<<<<<<" $ROOT/$file | awk -F: '{print $1}'`
-        end=`grep -n ">>>>>>>" $ROOT/$file | awk -F: '{print $1}'`
-        qty="$[$end-$beg-3]"
-      fi
+      qty=`git diff --numstat HEAD $ROOT/$file | tail -1 | awk '{print $2}'`
 
       # If only the version line changed
       if [ "$qty" == "1" ]
@@ -180,6 +182,30 @@ neperfepx_git_merge()
         git add $ROOT/$file
       fi
     done
+
+    if [ "${CMakeLists_change}" == "0" ]
+    then
+      git checkout --ours $ROOT/src/CMakeLists.txt
+      git add $ROOT/src/CMakeLists.txt
+    fi
+
+    if [ "${VERSIONS_change}" == "0" ]
+    then
+      git checkout --ours $ROOT/VERSIONS
+      git add $ROOT/VERSIONS
+    fi
+
+    if [ "${confpy_change}" == "0" ]
+    then
+      git checkout --ours $ROOT/doc/conf.py
+      git add $ROOT/doc/conf.py
+    fi
+
+    if [ [ "$CODE" == "FEPX" ] && [ "${fepx_change}" == "0" ] ]
+    then
+      git checkout --ours $ROOT/src/fepx.f90
+      git add $ROOT/src/fepx.f90
+    fi
 
     # Resolving other conflicts (if any)
     git mergetool --tool=meld
