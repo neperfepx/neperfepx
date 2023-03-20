@@ -91,12 +91,6 @@ neperfepx_git_commit()
     $EDITOR $ROOT/VERSIONS
     git add $ROOT/VERSIONS $ROOT/doc/conf.py $ROOT/src/CMakeLists.txt
 
-    if [ "$CODE" == "FEPX" ]
-    then
-      sed_i "1,100s/Version.*/Version $version'/g" $ROOT/src/fepx.f90
-      git add $ROOT/src/fepx.f90
-    fi
-
   else
     for file in neperfepx-git neperfepx-release
     do
