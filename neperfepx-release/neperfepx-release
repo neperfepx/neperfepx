@@ -112,6 +112,9 @@ then
   echo "Adding tag '$nextversiontagstart'..."
   git tag $nextversiontagstart -m "Starting version $nextversion."
 
+  echo "Removing tag '$oldversiontagstart'..."
+  git tag -d $oldversiontagstart
+
   echo "Archiving 'devel' branch as 'devel-$oldversion'..."
   git branch -m devel devel-$oldversion
 
@@ -247,6 +250,7 @@ then
   rm release-notes-file
 fi
 
+echo "All done!"
 echo "========================================================================"
 
 exit 0
