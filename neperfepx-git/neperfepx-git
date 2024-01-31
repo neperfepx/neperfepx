@@ -55,9 +55,9 @@ neperfepx_git_commit()
   fi
 
   date=`date +"%d %b %G"`
-  tag=`git describe --match "*start" | grep start | awk -F- '{print $1}'`
+  tag=`git describe --tags --match "*start" | grep start | awk -F- '{print $1}'`
   tag="${tag:1}"
-  id=` git describe --match "*start" | grep start | awk -F- '{print $3}'`
+  id=` git describe --tags --match "*start" | grep start | awk -F- '{print $3}'`
 
   if [ ! "$tag" ]
   then
