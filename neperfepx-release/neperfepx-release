@@ -7,10 +7,14 @@ VERSION="1.0.1-6"
 if [ "`pwd | grep "$NEPERROOT"`" ]
 then
   NAME="Neper"
+  REPO="neperfepx/neper"
+  REPO_DEV="neperfepx/neper-dev"
   ROOT=$NEPERROOT
 elif [ "`pwd | grep "$FEPXROOT"`" ]
 then
   NAME="FEPX"
+  REPO="neperfepx/FEPX"
+  REPO_DEV="neperfepx/FEPX-dev"
   ROOT=$FEPXROOT
 else
   echo "I am not in a Neper or FEPX directory.  Exiting..."
@@ -245,7 +249,8 @@ then
   sed -e '/^$/,$d' VERSIONS > release-notes-file
 
   gh auth login
-  gh release create $newversiontag --notes-file release-notes-file
+  gh release create $newversiontag --repo $REPO --notes-file release-notes-file
+  gh release create $newversiontag --repo $REPO_DEV --notes-file release-notes-file
 
   rm release-notes-file
 fi
