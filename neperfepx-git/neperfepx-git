@@ -74,6 +74,10 @@ neperfepx_git_commit()
     version="$tag-$id-$branch"
   fi
 
+  version_major=`echo $version | awk -F . '{print $1}'`
+  version_minor=`echo $version | awk -F . '{print $2}'`
+  version_patch=`echo $version | awk -F . '{print $3}'`
+
   if [ "$CODE" != "NEPERFEPX" ]
   then
     if [ "$id" == "1" ]
@@ -87,6 +91,10 @@ neperfepx_git_commit()
     sed_i "1,100s/^release = .*/release = u'$version'/g" $ROOT/doc/conf.py
 
     sed_i "1,100s/set(${CODE}_VERSION.*/set(${CODE}_VERSION \\\\\"$version\\\\\")/g" $ROOT/src/CMakeLists.txt
+
+    sed_i "s/set(CPACK_PACKAGE_VERSION_MAJOR.*/set(CPACK_PACKAGE_VERSION_MAJOR $version_major)/g" $ROOT/src/CMakeLists.txt
+    sed_i "s/set(CPACK_PACKAGE_VERSION_MINOR.*/set(CPACK_PACKAGE_VERSION_MINOR $version_minor)/g" $ROOT/src/CMakeLists.txt
+    sed_i "s/set(CPACK_PACKAGE_VERSION_PATCH.*/set(CPACK_PACKAGE_VERSION_PATCH $version_patch)/g" $ROOT/src/CMakeLists.txt
 
     $EDITOR $ROOT/VERSIONS
     git add $ROOT/VERSIONS $ROOT/doc/conf.py $ROOT/src/CMakeLists.txt
